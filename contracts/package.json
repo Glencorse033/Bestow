@@ -1,0 +1,18 @@
+{
+    "name": "bestow-contracts",
+    "version": "1.0.0",
+    "description": "Smart contracts for Bestow dApp",
+    "main": "index.js",
+    "scripts": {
+        "test": "hardhat test",
+        "compile": "hardhat compile",
+        "deploy": "hardhat run scripts/deploy.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+        "hardhat": "^2.19.0"
+    }
+}

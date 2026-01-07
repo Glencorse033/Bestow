@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --font-outfit: 'Outfit', sans-serif;
+
+  /* Light Mode Colors */
+  --bg-primary-light: #ffffff;
+  --bg-secondary-light: #f3f4f6;
+  --text-primary-light: #111827;
+  --text-secondary-light: #4b5563;
+  --accent-light: #10b981;
+  /* Emerald 500 */
+  --accent-glow-light: rgba(16, 185, 129, 0.2);
+  --card-bg-light: rgba(255, 255, 255, 0.7);
+  --border-light: rgba(0, 0, 0, 0.1);
+
+  /* Dark Mode Colors */
+  --bg-primary-dark: #0f172a;
+  --bg-secondary-dark: #1e293b;
+  --text-primary-dark: #f8fafc;
+  --text-secondary-dark: #94a3b8;
+  --accent-dark: #34d399;
+  /* Emerald 400 */
+  --accent-glow-dark: rgba(52, 211, 153, 0.2);
+  --card-bg-dark: rgba(30, 41, 59, 0.7);
+  --border-dark: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='light'] {
+  --bg-primary: var(--bg-primary-light);
+  --bg-secondary: var(--bg-secondary-light);
+  --text-primary: var(--text-primary-light);
+  --text-secondary: var(--text-secondary-light);
+  --accent: var(--accent-light);
+  --accent-glow: var(--accent-glow-light);
+  --card-bg: var(--card-bg-light);
+  --border: var(--border-light);
+}
+
+[data-theme='dark'] {
+  --bg-primary: var(--bg-primary-dark);
+  --bg-secondary: var(--bg-secondary-dark);
+  --text-primary: var(--text-primary-dark);
+  --text-secondary: var(--text-secondary-dark);
+  --accent: var(--accent-dark);
+  --accent-glow: var(--accent-glow-dark);
+  --card-bg: var(--card-bg-dark);
+  --border: var(--border-dark);
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: var(--font-outfit);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Typography & Layout */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 99px;
+  /* Pill shape */
+  font-weight: 600;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--accent-glow);
+}
+
+/* Utilities */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glow-text {
+  text-shadow: 0 0 20px var(--accent-glow);
+}
