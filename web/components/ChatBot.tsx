@@ -18,15 +18,15 @@ const KNOWLEDGE_BASE = [
     },
     {
         keywords: ['what is bestow', 'about', 'explain'],
-        response: "Bestow is a decentralized crowdfunding platform secured by AI-powered risk analysis and milestone-based escrow. We also offer Yield Vaults on ARC, Soneium, and Ink."
+        response: "Bestow is a decentralized crowdfunding platform secured by AI-powered risk analysis and milestone-based escrow. We are powered by the ARC Network, enabling real yield for contributors."
     },
     {
         keywords: ['vault', 'yield', 'earn', 'income'],
-        response: "Our Vaults allow you to earn passive income. We offer: \n• Stablecoin Yield on ARC (USDC)\n• Bridged Blue Chip on Soneium\n• Native Staking on Ink"
+        response: "Our Vaults allow you to earn passive income. We offer institutional-grade yield on ARC for:\n• USDC\n• EURC\n• USYC"
     },
     {
-        keywords: ['network', 'chain', 'soneium', 'ink', 'arc'],
-        response: "We operate on:\n• ARC Testnet (USDC Gas)\n• Soneium Mainnet (ETH Gas)\n• Ink Mainnet (ETH Gas)"
+        keywords: ['network', 'chain', 'arc'],
+        response: "We operate exclusively on the ARC Testnet, utilizing USDC for gas and supporting institutional stablecoins."
     },
     {
         keywords: ['risk', 'safety', 'audit', 'ai'],

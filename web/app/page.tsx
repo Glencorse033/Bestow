@@ -119,7 +119,7 @@ export default function Home() {
                     >
                         <div style={{ fontSize: '2rem', marginBottom: '16px' }}>💰</div>
                         <h3 style={{ marginBottom: '12px' }}>Yield Vaults</h3>
-                        <p style={{ color: 'var(--text-secondary)' }}>Earn native yield on your idle assets with our specialized vaults on ARC, Soneium, and Ink.</p>
+                        <p style={{ color: 'var(--text-secondary)' }}>Earn native yield on your idle assets with our specialized institutional vaults on the ARC Network.</p>
                     </motion.div>
                 </div>
             </section>

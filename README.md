@@ -8,12 +8,10 @@ Welcome to **Bestow**! This is a cutting-edge dApp tailored for the ARC Network.
 
 ## Prerequisites
 - Node.js (v18+)
-- MetaMask (Connected to ARC, Soneium, or Ink Testnets)
+- MetaMask (Connected to ARC Testnet)
 
 ## Network Details
 - **ARC Testnet**: Chain ID 5042002 (Gas: USDC)
-- **Soneium Mainnet**: Chain ID 1868 (Gas: ETH)
-- **Ink Mainnet**: Chain ID 57073 (Gas: ETH)
 
 ## Setup Instructions
 
