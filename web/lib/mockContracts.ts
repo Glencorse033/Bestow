@@ -4,7 +4,7 @@
 const DB_KEY = 'bestow_simulation_db';
 
 interface UserState {
-    balance: number; // Mock USDC balance
+    balances: Record<string, number>; // Mock balances keyed by asset symbol (USDC, EURC, etc.)
     vaultDeposits: Record<string, { // Keyed by vaultId
         amount: number;
         timestamp: number;
@@ -14,7 +14,11 @@ interface UserState {
 }
 
 const INITIAL_STATE: UserState = {
-    balance: 10000,
+    balances: {
+        'USDC': 10000,
+        'EURC': 5000,
+        'USYC': 2000
+    },
     vaultDeposits: {},
     campaigns: []
 };
@@ -23,7 +27,15 @@ const INITIAL_STATE: UserState = {
 const getState = (): UserState => {
     if (typeof window === 'undefined') return INITIAL_STATE;
     const stored = localStorage.getItem(DB_KEY);
-    return stored ? JSON.parse(stored) : INITIAL_STATE;
+    if (!stored) return INITIAL_STATE;
+
+    // Migration: if old state had 'balance' instead of 'balances', convert it
+    const parsed = JSON.parse(stored);
+    if (parsed.balance !== undefined && !parsed.balances) {
+        parsed.balances = { 'USDC': parsed.balance, 'EURC': 5000, 'USYC': 2000 };
+        delete parsed.balance;
+    }
+    return parsed;
 };
 
 const setState = (state: UserState) => {
@@ -33,7 +45,7 @@ const setState = (state: UserState) => {
 
 // BestowVault Simulation
 export const BestowVault = {
-    APY: 12.5, // 12.5%
+    APY: 12.5, // Default base APY
     LOCKUP_SECONDS: 20,
 
     // Helper to get specific vault state or init it
@@ -44,18 +56,19 @@ export const BestowVault = {
         return state.vaultDeposits[vaultId];
     },
 
-    deposit: async (vaultId: string, amount: number) => {
+    deposit: async (vaultId: string, amount: number, asset: string) => {
         await new Promise(r => setTimeout(r, 1000));
         const state = getState();
         const vault = BestowVault.getVaultState(state, vaultId);
+        const currentBalance = state.balances[asset] || 0;
 
-        if (state.balance < amount) throw new Error("Insufficient Balance");
+        if (currentBalance < amount) throw new Error(`Insufficient ${asset} Balance`);
 
         // Claim existing yield first
         const pending = BestowVault.calculateYield(vaultId);
 
-        state.balance -= amount;
-        state.balance += pending;
+        state.balances[asset] = currentBalance - amount;
+        state.balances[asset] += pending;
 
         vault.amount += amount;
         vault.timestamp = Date.now();
@@ -65,7 +78,7 @@ export const BestowVault = {
         return true;
     },
 
-    withdraw: async (vaultId: string, amount: number) => {
+    withdraw: async (vaultId: string, amount: number, asset: string) => {
         await new Promise(r => setTimeout(r, 1000));
         const state = getState();
         const vault = BestowVault.getVaultState(state, vaultId);
@@ -81,8 +94,7 @@ export const BestowVault = {
         const pending = BestowVault.calculateYield(vaultId);
 
         vault.amount -= amount;
-        state.balance += amount;
-        state.balance += pending;
+        state.balances[asset] = (state.balances[asset] || 0) + amount + pending;
         vault.lastClaim = Date.now();
 
         setState(state);
@@ -95,15 +107,15 @@ export const BestowVault = {
         if (!vault || vault.amount === 0) return 0;
 
         const timeElapsedSeconds = (Date.now() - vault.lastClaim) / 1000;
+        // Simplified yield math for demo
         const ratePerSecond = 0.125 / (365 * 24 * 3600);
         return vault.amount * ratePerSecond * timeElapsedSeconds;
     },
 
-    getUserData: (vaultId: string) => {
+    getUserData: (vaultId: string, asset: string) => {
         const state = getState();
-        // Return structured data for simple consumption
         return {
-            balance: state.balance,
+            balance: state.balances[asset] || 0,
             deposit: state.vaultDeposits[vaultId] || { amount: 0, timestamp: 0, lastClaim: 0 },
             yield: BestowVault.calculateYield(vaultId)
         };
@@ -139,12 +151,12 @@ export const BestowHub = {
         await new Promise(r => setTimeout(r, 1000));
         const state = getState();
 
-        if (state.balance < amount) throw new Error("Insufficient Balance");
+        if ((state.balances['USDC'] || 0) < amount) throw new Error("Insufficient Balance");
 
         const campaign = state.campaigns.find((c: any) => c.id === campaignId);
         if (!campaign) throw new Error("Campaign not found");
 
-        state.balance -= amount;
+        state.balances['USDC'] = (state.balances['USDC'] || 0) - amount;
         campaign.raised += amount;
 
         setState(state);

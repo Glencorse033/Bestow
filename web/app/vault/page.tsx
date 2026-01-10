@@ -3,36 +3,7 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { BestowVault } from '../../lib/mockContracts';
-
-const VAULTS = [
-    {
-        id: 'pool-arc-usdc',
-        network: 'ARC',
-        name: 'Stablecoin Yield Alpha',
-        apy: '12.5%',
-        tvl: '$1.2M',
-        asset: 'USDC',
-        risk: 'Low'
-    },
-    {
-        id: 'pool-soneium-usdc',
-        network: 'SONEIUM',
-        name: 'Bridged Blue Chip',
-        apy: '8.2%',
-        tvl: '$540K',
-        asset: 'USDC.e',
-        risk: 'Medium'
-    },
-    {
-        id: 'pool-ink-eth',
-        network: 'INK',
-        name: 'Native Ink Staking',
-        apy: '15.0%',
-        tvl: '$2.1M',
-        asset: 'ETH',
-        risk: 'High'
-    }
-];
+import { VAULTS } from '../../lib/config';
 
 export default function VaultPage() {
     const [selectedVault, setSelectedVault] = useState<any | null>(null);
@@ -43,7 +14,7 @@ export default function VaultPage() {
             <div style={{ marginBottom: '60px', textAlign: 'center' }}>
                 <h1 style={{ fontSize: '3rem', marginBottom: '16px' }}>Yield Vaults</h1>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem' }}>
-                    Passive income opportunities across ARC, Soneium, and Ink.
+                    Institutional-grade yield opportunities powered by the ARC Network.
                 </p>
             </div>
 
@@ -82,7 +53,7 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
     useEffect(() => {
         if (vault) {
             setAmount('');
-            setUserData(BestowVault.getUserData(vault.id));
+            setUserData(BestowVault.getUserData(vault.id, vault.asset));
         }
     }, [vault, action]);
 
@@ -99,9 +70,9 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
         setLoading(true);
         try {
             if (action === 'deposit') {
-                await BestowVault.deposit(vault.id, enteredAmount);
+                await BestowVault.deposit(vault.id, enteredAmount, vault.asset);
             } else {
-                await BestowVault.withdraw(vault.id, enteredAmount);
+                await BestowVault.withdraw(vault.id, enteredAmount, vault.asset);
             }
             onClose();
         } catch (err) {
@@ -186,11 +157,11 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
     // Initial fetch
     useEffect(() => {
         const interval = setInterval(() => {
-            const data = BestowVault.getUserData(vault.id);
+            const data = BestowVault.getUserData(vault.id, vault.asset);
             setUserData(data);
         }, 1000);
         return () => clearInterval(interval);
-    }, [vault.id]);
+    }, [vault.id, vault.asset]);
 
     return (
         <motion.div
@@ -234,11 +205,11 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
                 <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Your Balance:</span>
-                        <span style={{ fontWeight: 700 }}>${userData.balance.toFixed(2)}</span>
+                        <span style={{ fontWeight: 700 }}>{userData.balance.toFixed(2)} {vault.asset}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Deposited:</span>
-                        <span style={{ fontWeight: 700, color: 'var(--accent)' }}>${userData.deposit.amount.toFixed(2)}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{userData.deposit.amount.toFixed(2)} {vault.asset}</span>
                     </div>
                 </div>
             )}
