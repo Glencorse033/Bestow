@@ -22,18 +22,15 @@ export default function Footer() {
                     <div style={{ maxWidth: '300px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                             <div style={{
-                                width: '32px',
-                                height: '32px',
-                                background: 'var(--accent)',
-                                borderRadius: '4px',
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '10px',
+                                overflow: 'hidden',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'var(--bg-primary)',
-                                fontWeight: 'bold',
-                                fontSize: '18px'
+                                justifyContent: 'center'
                             }}>
-                                B
+                                <img src="/logo-final.png" alt="Bestow" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             </div>
                             <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>bestow</span>
                         </div>
@@ -75,9 +72,15 @@ export default function Footer() {
                             </h4>
                             <div style={{ display: 'flex', gap: '16px' }}>
                                 {/* Mocking Icons with text/ascii if Lucide doesn't render perfectly in all environments without setup, but using Lucide class names */}
-                                <div style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', cursor: 'pointer' }}>X</div>
-                                <div style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', cursor: 'pointer' }}>👾</div>
-                                <div style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', cursor: 'pointer' }}>💻</div>
+                                <div style={{ width: '40px', height: '40px', background: 'var(--bg-secondary)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <img src="/icon-x.png" alt="X" style={{ width: '20px', height: '20px' }} />
+                                </div>
+                                <div style={{ width: '40px', height: '40px', background: 'var(--bg-secondary)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <img src="/icon-discord.png" alt="Discord" style={{ width: '24px', height: '24px' }} />
+                                </div>
+                                <div style={{ width: '40px', height: '40px', background: 'var(--bg-secondary)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <img src="/icon-github.png" alt="GitHub" style={{ width: '24px', height: '24px' }} />
+                                </div>
                             </div>
                         </div>
                     </div>

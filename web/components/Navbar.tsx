@@ -120,17 +120,16 @@ export default function Navbar({ theme, toggleTheme }: NavbarProps) {
             {/* Logo Section */}
             <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                    width: '40px',
-                    height: '40px',
-                    background: 'var(--accent)',
-                    borderRadius: '8px',
+                    width: '90px',
+                    height: '90px',
+                    borderRadius: '18px',
+                    overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--bg-primary)',
-                    fontSize: '1.5rem',
-                    fontWeight: 800
-                }}>B</div>
+                    justifyContent: 'center'
+                }}>
+                    <img src="/logo-final.png" alt="Bestow Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
                 <Link href="/" style={{ textDecoration: 'none', color: 'var(--text-primary)', fontSize: '1.5rem', fontWeight: 800 }}>
                     bestow
                 </Link>
@@ -246,6 +245,45 @@ export default function Navbar({ theme, toggleTheme }: NavbarProps) {
                                 boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
                             }}
                         >
+                            <button
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await switchNetwork(currentNetwork as any); // Re-ensure network
+                                    if (typeof window !== 'undefined' && (window as any).ethereum) {
+                                        try {
+                                            await (window as any).ethereum.request({
+                                                method: 'wallet_requestPermissions',
+                                                params: [{ eth_accounts: {} }]
+                                            });
+                                            // After permission change, accountsChanged event will handle state update
+                                            // But we can also explicitly fetch
+                                            const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+                                            if (accounts.length > 0) setWalletAddress(accounts[0]);
+                                        } catch (err) {
+                                            console.error("Switch wallet failed", err);
+                                        }
+                                    }
+                                    setShowWalletMenu(false);
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-primary)',
+                                    fontWeight: 700,
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    borderRadius: '8px',
+                                    fontSize: '0.9rem',
+                                    transition: 'background 0.2s',
+                                    marginBottom: '4px'
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                            >
+                                Switch Wallet
+                            </button>
                             <button
                                 onClick={disconnectWallet}
                                 style={{
