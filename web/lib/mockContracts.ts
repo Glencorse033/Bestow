@@ -101,14 +101,31 @@ export const BestowVault = {
         return true;
     },
 
+    getCurrentAPY: (vaultId: string, baseApy: number): number => {
+        const state = getState();
+        const vault = state.vaultDeposits[vaultId];
+        if (!vault || vault.amount === 0) return baseApy;
+
+        const timeElapsedSeconds = (Date.now() - vault.timestamp) / 1000;
+
+        // Tier 3: 90+ days (7,776,000s) -> 20%
+        if (timeElapsedSeconds >= 90 * 24 * 3600) return 20;
+        // Tier 2: 30-89 days (2,592,000s) -> 15%
+        if (timeElapsedSeconds >= 30 * 24 * 3600) return 15;
+
+        // Tier 1: Base APY
+        return baseApy;
+    },
+
     calculateYield: (vaultId: string, apy: number = 12.5): number => {
         const state = getState();
         const vault = state.vaultDeposits[vaultId];
         if (!vault || vault.amount === 0) return 0;
 
         const timeElapsedSeconds = (Date.now() - vault.lastClaim) / 1000;
-        // Use vault-specific APY (convert from percentage)
-        const ratePerSecond = (apy / 100) / (365 * 24 * 3600);
+        const currentApy = BestowVault.getCurrentAPY(vaultId, apy);
+
+        const ratePerSecond = (currentApy / 100) / (365 * 24 * 3600);
         return vault.amount * ratePerSecond * timeElapsedSeconds;
     },
 
@@ -117,7 +134,8 @@ export const BestowVault = {
         return {
             balance: state.balances[asset] || 0,
             deposit: state.vaultDeposits[vaultId] || { amount: 0, timestamp: 0, lastClaim: 0 },
-            yield: BestowVault.calculateYield(vaultId, apy)
+            yield: BestowVault.calculateYield(vaultId, apy),
+            currentApy: BestowVault.getCurrentAPY(vaultId, apy)
         };
     }
 };
