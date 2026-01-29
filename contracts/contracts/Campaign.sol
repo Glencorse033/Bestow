@@ -74,10 +74,11 @@ contract Campaign {
         require(totalRaised >= target, "Target not reached");
         require(!claimed, "Already claimed");
 
+        uint256 amount = address(this).balance;
         claimed = true;
-        payable(creator).transfer(address(this).balance);
+        payable(creator).transfer(amount);
         
-        emit FundsWithdrawn(creator, address(this).balance);
+        emit FundsWithdrawn(creator, amount);
     }
 
     // Mock Yield Function for demonstration

@@ -51,23 +51,35 @@ contract BestowVault {
         emit Deposited(msg.sender, msg.value);
     }
 
-    function withdraw(uint256 amount) external {
+    // Reentrancy guard
+    bool private locked;
+    modifier nonReentrant() {
+        require(!locked, "Reentrant call");
+        locked = true;
+        _;
+        locked = false;
+    }
+
+    function withdraw(uint256 amount) external nonReentrant {
         Deposit storage userDeposit = deposits[msg.sender];
         require(userDeposit.amount >= amount, "Insufficient balance");
         require(block.timestamp >= userDeposit.timestamp + lockupDuration, "Funds are locked");
 
-        // Calculate and transfer yield
+        // Calculate yield before state changes
         uint256 pending = calculateYield(msg.sender);
-        if (pending > 0) {
-            payable(msg.sender).transfer(pending);
-             userDeposit.lastClaim = block.timestamp; // Reset yield timer
-             emit YieldClaimed(msg.sender, pending);
-        }
-
+        
+        // Update state BEFORE external calls (Checks-Effects-Interactions)
         userDeposit.amount -= amount;
         totalDeposits -= amount;
+        userDeposit.lastClaim = block.timestamp;
         
-        payable(msg.sender).transfer(amount);
+        // Cache total to transfer
+        uint256 totalTransfer = amount + pending;
+        
+        // Single external call at the end
+        payable(msg.sender).transfer(totalTransfer);
+        
+        emit YieldClaimed(msg.sender, pending);
         emit Withdrawn(msg.sender, amount, pending);
     }
 

@@ -101,23 +101,23 @@ export const BestowVault = {
         return true;
     },
 
-    calculateYield: (vaultId: string): number => {
+    calculateYield: (vaultId: string, apy: number = 12.5): number => {
         const state = getState();
         const vault = state.vaultDeposits[vaultId];
         if (!vault || vault.amount === 0) return 0;
 
         const timeElapsedSeconds = (Date.now() - vault.lastClaim) / 1000;
-        // Simplified yield math for demo
-        const ratePerSecond = 0.125 / (365 * 24 * 3600);
+        // Use vault-specific APY (convert from percentage)
+        const ratePerSecond = (apy / 100) / (365 * 24 * 3600);
         return vault.amount * ratePerSecond * timeElapsedSeconds;
     },
 
-    getUserData: (vaultId: string, asset: string) => {
+    getUserData: (vaultId: string, asset: string, apy: number = 12.5) => {
         const state = getState();
         return {
             balance: state.balances[asset] || 0,
             deposit: state.vaultDeposits[vaultId] || { amount: 0, timestamp: 0, lastClaim: 0 },
-            yield: BestowVault.calculateYield(vaultId)
+            yield: BestowVault.calculateYield(vaultId, apy)
         };
     }
 };
@@ -147,16 +147,19 @@ export const BestowHub = {
         const state = getState();
         return state.campaigns;
     },
-    donate: async (campaignId: number, amount: number) => {
+    donate: async (campaignId: number, amount: number, platformFee: number, gasFee: number) => {
         await new Promise(r => setTimeout(r, 1000));
         const state = getState();
 
-        if ((state.balances['USDC'] || 0) < amount) throw new Error("Insufficient Balance");
+        const total = amount + platformFee + gasFee;
+        if ((state.balances['USDC'] || 0) < total) throw new Error("Insufficient Balance");
 
         const campaign = state.campaigns.find((c: any) => c.id === campaignId);
         if (!campaign) throw new Error("Campaign not found");
 
-        state.balances['USDC'] = (state.balances['USDC'] || 0) - amount;
+        // Deduct total from user balance
+        state.balances['USDC'] = (state.balances['USDC'] || 0) - total;
+        // Only add base donation amount to campaign (fees stay in platform)
         campaign.raised += amount;
 
         setState(state);

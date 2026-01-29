@@ -6,8 +6,11 @@ import { useEffect, useState } from 'react';
 import { BestowHub } from '../../lib/mockContracts';
 import { Shield, X, Check, Info } from 'lucide-react';
 
+const MAX_DONATION = 10000; // Maximum donation limit
+
 export default function ExplorePage() {
     const [campaigns, setCampaigns] = useState<any[]>([]);
+    const [isConnected, setIsConnected] = useState(false);
 
     // Donation Logic State
     const [selectedCampaign, setSelectedCampaign] = useState<any | null>(null);
@@ -21,8 +24,27 @@ export default function ExplorePage() {
     const gasFee = 0.005; // Mock ARC Gas
     const total = amount + platformFee + gasFee;
 
+    // Check wallet connection
     useEffect(() => {
+        const checkConnection = async () => {
+            if (typeof window !== 'undefined' && (window as any).ethereum) {
+                try {
+                    const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+                    setIsConnected(accounts.length > 0);
+                } catch {
+                    setIsConnected(false);
+                }
+            }
+        };
+        checkConnection();
         loadCampaigns();
+
+        // Listen for account changes
+        if (typeof window !== 'undefined' && (window as any).ethereum) {
+            (window as any).ethereum.on('accountsChanged', (accounts: string[]) => {
+                setIsConnected(accounts.length > 0);
+            });
+        }
     }, []);
 
     const loadCampaigns = () => {
@@ -30,6 +52,10 @@ export default function ExplorePage() {
     };
 
     const handleDonateClick = (campaign: any) => {
+        if (!isConnected) {
+            alert("Please connect your wallet first!");
+            return;
+        }
         setSelectedCampaign(campaign);
         setDonationAmount('');
         setStep(1);
@@ -37,9 +63,17 @@ export default function ExplorePage() {
 
     const handleConfirm = async () => {
         if (!selectedCampaign) return;
+        if (!isConnected) {
+            alert("Please connect your wallet first!");
+            return;
+        }
+        if (amount > MAX_DONATION) {
+            alert(`Maximum donation is ${MAX_DONATION} USDC`);
+            return;
+        }
         setProcessing(true);
         try {
-            await BestowHub.donate(selectedCampaign.id, total); // Deduct total from user
+            await BestowHub.donate(selectedCampaign.id, amount, platformFee, gasFee);
             setStep(3); // Success
             loadCampaigns(); // Refresh progress
         } catch (err) {

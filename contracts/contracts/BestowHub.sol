@@ -28,6 +28,13 @@ contract BestowHub {
         uint256 _riskScore,
         string memory _riskLevel
     ) external {
+        // Input validation
+        require(bytes(_title).length > 0 && bytes(_title).length <= 100, "Title must be 1-100 chars");
+        require(bytes(_description).length >= 50 && bytes(_description).length <= 2000, "Description must be 50-2000 chars");
+        require(_target > 0, "Target must be > 0");
+        require(_durationInDays >= 1 && _durationInDays <= 365, "Duration must be 1-365 days");
+        require(_milestoneDescs.length <= 10, "Max 10 milestones");
+        
         uint256 deadline = block.timestamp + (_durationInDays * 1 days);
         Campaign newCampaign = new Campaign(
             _title,

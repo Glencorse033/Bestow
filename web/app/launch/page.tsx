@@ -44,6 +44,13 @@ export default function LaunchPage() {
 
                         if (!title || !goal || !desc) return;
 
+                        // Validate milestones sum to 100%
+                        const totalPct = milestones.reduce((acc, m) => acc + (m.amount || 0), 0);
+                        if (totalPct !== 100) {
+                            alert(`Milestone percentages must sum to 100%. Current total: ${totalPct}%`);
+                            return;
+                        }
+
                         setLoading(true);
                         try {
                             // Auto-run analysis

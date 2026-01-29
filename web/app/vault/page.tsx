@@ -53,7 +53,8 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
     useEffect(() => {
         if (vault) {
             setAmount('');
-            setUserData(BestowVault.getUserData(vault.id, vault.asset));
+            const apyValue = parseFloat(vault.apy) || 12.5;
+            setUserData(BestowVault.getUserData(vault.id, vault.asset, apyValue));
         }
     }, [vault, action]);
 
@@ -153,15 +154,50 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
 
 function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAction: (t: 'deposit' | 'withdraw') => void }) {
     const [userData, setUserData] = useState<any>(null);
+    const [isConnected, setIsConnected] = useState(false);
 
-    // Initial fetch
+    // Check wallet connection and fetch data
     useEffect(() => {
+        const checkConnection = async () => {
+            if (typeof window !== 'undefined' && (window as any).ethereum) {
+                try {
+                    const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+                    setIsConnected(accounts.length > 0);
+                } catch {
+                    setIsConnected(false);
+                }
+            }
+        };
+
+        checkConnection();
+
+        // Listen for account changes
+        if (typeof window !== 'undefined' && (window as any).ethereum) {
+            const handleAccounts = (accounts: string[]) => {
+                setIsConnected(accounts.length > 0);
+            };
+            (window as any).ethereum.on('accountsChanged', handleAccounts);
+            return () => {
+                (window as any).ethereum?.removeListener('accountsChanged', handleAccounts);
+            };
+        }
+    }, []);
+
+    // Only fetch user data if connected
+    useEffect(() => {
+        if (!isConnected) {
+            setUserData(null);
+            return;
+        }
+
         const interval = setInterval(() => {
-            const data = BestowVault.getUserData(vault.id, vault.asset);
+            // Parse APY from vault config (e.g., "12.5%" -> 12.5)
+            const apyValue = parseFloat(vault.apy) || 12.5;
+            const data = BestowVault.getUserData(vault.id, vault.asset, apyValue);
             setUserData(data);
         }, 1000);
         return () => clearInterval(interval);
-    }, [vault.id, vault.asset]);
+    }, [vault.id, vault.asset, isConnected]);
 
     return (
         <motion.div
@@ -200,19 +236,17 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
                 </div>
             </div>
 
-            {/* User Data (Only visible for active demo vault - usually the first one or valid network) */}
-            {userData && (
-                <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Your Balance:</span>
-                        <span style={{ fontWeight: 700 }}>{userData.balance.toFixed(2)} {vault.asset}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Deposited:</span>
-                        <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{userData.deposit.amount.toFixed(2)} {vault.asset}</span>
-                    </div>
+            {/* User Data - Always show, but with 0 values when not connected */}
+            <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Your Balance:</span>
+                    <span style={{ fontWeight: 700 }}>{isConnected && userData ? userData.balance.toFixed(2) : '0.00'} {vault.asset}</span>
                 </div>
-            )}
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Deposited:</span>
+                    <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{isConnected && userData ? userData.deposit.amount.toFixed(2) : '0.00'} {vault.asset}</span>
+                </div>
+            </div>
 
             <div style={{ display: 'flex', gap: '12px' }}>
                 <button
