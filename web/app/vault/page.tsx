@@ -3,7 +3,9 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { BestowVault } from '../../lib/mockContracts';
-import { VAULTS } from '../../lib/config';
+import { VAULTS, NETWORKS } from '../../lib/config';
+import { contractService } from '../../lib/contracts';
+import { ethers } from 'ethers';
 
 export default function VaultPage() {
     const [selectedVault, setSelectedVault] = useState<any | null>(null);
@@ -51,17 +53,32 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
     const [userData, setUserData] = useState<any>(null); // To check balance limit
 
     useEffect(() => {
-        if (vault) {
-            setAmount('');
-            const apyValue = parseFloat(vault.apy) || 12.5;
-            setUserData(BestowVault.getUserData(vault.id, vault.asset, apyValue));
-        }
+        const loadData = async () => {
+            if (vault) {
+                setAmount('');
+                // Try real data first if connected
+                if (typeof window !== 'undefined' && (window as any).ethereum) {
+                    const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+                    if (accounts.length > 0) {
+                        const data = await contractService.getVaultData(vault.address, accounts[0]);
+                        if (data) {
+                            setUserData(data);
+                            return;
+                        }
+                    }
+                }
+                // Fallback to mock
+                const apyValue = parseFloat(vault.apy) || 12.5;
+                setUserData(BestowVault.getUserData(vault.id, vault.asset, apyValue));
+            }
+        };
+        loadData();
     }, [vault, action]);
 
     if (!vault || !action) return null;
 
     const balance = userData?.balance || 0;
-    const deposited = userData?.deposit.amount || 0;
+    const deposited = userData?.deposited !== undefined ? userData.deposited : (userData?.deposit?.amount || 0);
     const max = action === 'deposit' ? balance : deposited;
     const enteredAmount = parseFloat(amount) || 0;
     const isValid = enteredAmount > 0 && enteredAmount <= max;
@@ -70,14 +87,30 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
         if (!isValid) return;
         setLoading(true);
         try {
+            // Try real transaction if connected
+            if (typeof window !== 'undefined' && (window as any).ethereum) {
+                const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    if (action === 'deposit') {
+                        await contractService.deposit(vault.address, amount);
+                    } else {
+                        await contractService.withdraw(vault.address, amount);
+                    }
+                    onClose();
+                    return;
+                }
+            }
+
+            // Fallback to simulation
             if (action === 'deposit') {
                 await BestowVault.deposit(vault.id, enteredAmount, vault.asset);
             } else {
                 await BestowVault.withdraw(vault.id, enteredAmount, vault.asset);
             }
             onClose();
-        } catch (err) {
-            alert((err as any).message);
+        } catch (err: any) {
+            console.error("Action error:", err);
+            alert(err.reason || err.message || "Transaction failed");
         } finally {
             setLoading(false);
         }
@@ -190,14 +223,25 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
             return;
         }
 
-        const interval = setInterval(() => {
-            // Parse APY from vault config (e.g., "12.5%" -> 12.5)
+        const interval = setInterval(async () => {
+            if (typeof window !== 'undefined' && (window as any).ethereum) {
+                const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    const data = await contractService.getVaultData(vault.address, accounts[0]);
+                    if (data) {
+                        setUserData(data);
+                        return;
+                    }
+                }
+            }
+
+            // Fallback to simulation if contract call fails or not available
             const apyValue = parseFloat(vault.apy) || 12.5;
             const data = BestowVault.getUserData(vault.id, vault.asset, apyValue);
             setUserData(data);
-        }, 1000);
+        }, 3000); // 3 seconds for blockchain updates
         return () => clearInterval(interval);
-    }, [vault.id, vault.asset, isConnected]);
+    }, [vault.id, vault.asset, vault.address, isConnected]);
 
     return (
         <motion.div
@@ -244,7 +288,7 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Deposited:</span>
-                    <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{isConnected && userData ? userData.deposit.amount.toFixed(2) : '0.00'} {vault.asset}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{isConnected && userData ? (userData.deposited !== undefined ? userData.deposited.toFixed(2) : userData.deposit.amount.toFixed(2)) : '0.00'} {vault.asset}</span>
                 </div>
             </div>
 
