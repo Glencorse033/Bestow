@@ -31,14 +31,4 @@ export const VAULTS = [
         risk: 'Medium',
         address: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a'
     },
-    {
-        id: 'pool-arc-usyc',
-        network: 'ARC',
-        name: 'Institutional USYC',
-        apy: '5.1%',
-        tvl: '$3.5M',
-        asset: 'USYC',
-        risk: 'Low',
-        address: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C'
-    }
 ];

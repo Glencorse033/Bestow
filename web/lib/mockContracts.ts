@@ -16,8 +16,7 @@ interface UserState {
 const INITIAL_STATE: UserState = {
     balances: {
         'USDC': 10000,
-        'EURC': 5000,
-        'USYC': 2000
+        'EURC': 5000
     },
     vaultDeposits: {},
     campaigns: []
@@ -32,7 +31,7 @@ const getState = (): UserState => {
     // Migration: if old state had 'balance' instead of 'balances', convert it
     const parsed = JSON.parse(stored);
     if (parsed.balance !== undefined && !parsed.balances) {
-        parsed.balances = { 'USDC': parsed.balance, 'EURC': 5000, 'USYC': 2000 };
+        parsed.balances = { 'USDC': parsed.balance, 'EURC': 5000 };
         delete parsed.balance;
     }
     return parsed;
