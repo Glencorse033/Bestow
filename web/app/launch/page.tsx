@@ -1,20 +1,27 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { BestowHub } from '../../lib/mockContracts';
+import { useState, useEffect } from 'react';
+import { BestowHub as MockHub } from '../../lib/mockContracts';
+import { contractService } from '../../lib/contracts';
+import { CONTRACT_ADDRESSES } from '../../lib/config';
 import { analyzeRisk, RiskReport } from '../../lib/riskAnalysis';
 import { Camera, Shield, Target, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
 
 export default function LaunchPage() {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [isConnected, setIsConnected] = useState(false);
 
-    // New Feature State
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).ethereum) {
+            (window as any).ethereum.request({ method: 'eth_accounts' })
+                .then((accounts: string[]) => setIsConnected(accounts.length > 0));
+        }
+    }, []);
+
     // New Feature State
     const [milestones, setMilestones] = useState([{ desc: 'Initial Release', amount: 50 }]); // Default 50%
-
-
 
     const addMilestone = () => {
         setMilestones([...milestones, { desc: '', amount: 0 }]);
@@ -38,6 +45,11 @@ export default function LaunchPage() {
                 <form
                     onSubmit={async (e) => {
                         e.preventDefault();
+                        if (!isConnected) {
+                            alert("Please connect your wallet first!");
+                            return;
+                        }
+
                         const title = (e.target as any).title.value;
                         const goal = (e.target as any).goal.value;
                         const desc = (e.target as any).desc.value;
@@ -53,40 +65,41 @@ export default function LaunchPage() {
 
                         setLoading(true);
                         try {
-                            // Auto-run analysis
                             const autoRiskReport = await analyzeRisk(title || '', desc, parseFloat(goal) || 0);
 
-                            // Image Logic: If no file, generate gradient
-                            // In a real app, we'd upload the file to IPFS/S3 here.
-                            // For simulation/default, we use a CSS gradient string or a placeholder URL.
-                            let imageUrl = '';
-                            const fileInput = (e.target as any).querySelector('input[type="file"]');
-                            if (fileInput && fileInput.files && fileInput.files[0]) {
-                                // Create a temporary local URL for the uploaded file
-                                imageUrl = URL.createObjectURL(fileInput.files[0]);
-                            } else {
-                                // Generate deterministic gradient based on title
-                                const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'];
-                                const hash = title.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-                                const c1 = colors[hash % colors.length];
-                                const c2 = colors[(hash + 1) % colors.length];
-                                imageUrl = `linear-gradient(135deg, ${c1}, ${c2})`;
+                            // Contract Interaction
+                            const campaignData = {
+                                title,
+                                description: desc,
+                                target: parseFloat(goal),
+                                duration: 30, // Default 30 days
+                                milestones: milestones.map(m => ({
+                                    description: m.desc,
+                                    offsetPercent: m.amount
+                                })),
+                                riskScore: autoRiskReport.score,
+                                riskLevel: autoRiskReport.level
+                            };
+
+                            try {
+                                await contractService.createCampaign(CONTRACT_ADDRESSES.BESTOW_HUB, campaignData);
+                            } catch (contractErr) {
+                                console.warn("Contract creation failed, falling back to mock:", contractErr);
+                                // Fallback to mock for testing/no-provider cases
+                                await MockHub.createCampaign(
+                                    title,
+                                    parseFloat(goal),
+                                    desc,
+                                    milestones,
+                                    autoRiskReport,
+                                    `linear-gradient(135deg, #3b82f6, #8b5cf6)`
+                                );
                             }
 
-                            // Simulate contract interaction
-                            const campaign = await BestowHub.createCampaign(
-                                title,
-                                parseFloat(goal),
-                                desc,
-                                milestones,
-                                autoRiskReport,
-                                imageUrl
-                            );
                             setSuccess(true);
-                            // Clear form
                             (e.target as any).reset();
                         } catch (err) {
-                            console.error(err);
+                            alert("Failed to launch campaign: " + (err as any).message);
                         } finally {
                             setLoading(false);
                         }

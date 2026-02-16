@@ -3,14 +3,18 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { BestowHub } from '../../lib/mockContracts';
+import { BestowHub as MockHub } from '../../lib/mockContracts';
+import { contractService, CAMPAIGN_ABI } from '../../lib/contracts';
+import { CONTRACT_ADDRESSES } from '../../lib/config';
 import { Shield, X, Check, Info } from 'lucide-react';
+import { ethers } from 'ethers';
 
 const MAX_DONATION = 10000; // Maximum donation limit
 
 export default function ExplorePage() {
     const [campaigns, setCampaigns] = useState<any[]>([]);
     const [isConnected, setIsConnected] = useState(false);
+    const [address, setAddress] = useState<string | null>(null);
 
     // Donation Logic State
     const [selectedCampaign, setSelectedCampaign] = useState<any | null>(null);
@@ -21,35 +25,69 @@ export default function ExplorePage() {
     // Derived Fees
     const amount = parseFloat(donationAmount) || 0;
     const platformFee = amount * 0.01;
-    const gasFee = 0.005; // Mock ARC Gas
+    const gasFee = 0.005; // Base ARC Gas
     const total = amount + platformFee + gasFee;
 
-    // Check wallet connection
+    // Check wallet connection and load data
     useEffect(() => {
         const checkConnection = async () => {
             if (typeof window !== 'undefined' && (window as any).ethereum) {
                 try {
                     const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
                     setIsConnected(accounts.length > 0);
+                    setAddress(accounts[0] || null);
                 } catch {
                     setIsConnected(false);
                 }
             }
         };
         checkConnection();
-        loadCampaigns();
 
         // Listen for account changes
+        const handleAccounts = (accounts: string[]) => {
+            setIsConnected(accounts.length > 0);
+            setAddress(accounts[0] || null);
+        };
+
         if (typeof window !== 'undefined' && (window as any).ethereum) {
-            (window as any).ethereum.on('accountsChanged', (accounts: string[]) => {
-                setIsConnected(accounts.length > 0);
-            });
+            (window as any).ethereum.on('accountsChanged', handleAccounts);
         }
+
+        return () => {
+            if (typeof window !== 'undefined' && (window as any).ethereum) {
+                (window as any).ethereum.removeListener('accountsChanged', handleAccounts);
+            }
+        };
     }, []);
 
-    const loadCampaigns = () => {
-        BestowHub.getCampaigns().then(setCampaigns);
-    };
+    useEffect(() => {
+        const load = async () => {
+            if (isConnected) {
+                const liveCampaigns = await contractService.getCampaigns(CONTRACT_ADDRESSES.BESTOW_HUB);
+                if (liveCampaigns && liveCampaigns.length > 0) {
+                    // Enrich with details
+                    const enriched = await Promise.all(liveCampaigns.map(async (c: any) => {
+                        const details = await contractService.getCampaignDetails(c.campaignAddress);
+                        // Fetch additional prod fields
+                        const campaign = new ethers.Contract(c.campaignAddress, CAMPAIGN_ABI, (contractService as any).provider);
+                        const totalClaimed = await campaign.totalClaimed();
+                        const paused = await campaign.paused();
+                        const inVault = await campaign.inVault();
+                        return { ...c, ...details, totalClaimed: parseFloat(ethers.formatEther(totalClaimed)), paused, inVault };
+                    }));
+                    setCampaigns(enriched);
+                    return;
+                }
+            }
+            // Fallback to Mock
+            const mockList = await MockHub.getCampaigns();
+            setCampaigns(mockList);
+        };
+
+        load();
+        const interval = setInterval(load, 5000);
+        return () => clearInterval(interval);
+    }, [isConnected]);
 
     const handleDonateClick = (campaign: any) => {
         if (!isConnected) {
@@ -73,11 +111,30 @@ export default function ExplorePage() {
         }
         setProcessing(true);
         try {
-            await BestowHub.donate(selectedCampaign.id, amount, platformFee, gasFee);
+            if (selectedCampaign.campaignAddress) {
+                // Real Contract Interaction
+                await contractService.donate(selectedCampaign.campaignAddress, amount.toString());
+            } else {
+                // Mock Fallback
+                await MockHub.donate(selectedCampaign.id, amount, platformFee, gasFee);
+            }
             setStep(3); // Success
-            loadCampaigns(); // Refresh progress
         } catch (err) {
             alert("Donation failed: " + (err as any).message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleActivateYield = async (campaignAddress: string) => {
+        try {
+            setProcessing(true);
+            await contractService.activateEscrowYield(campaignAddress);
+            alert("Yield Escrow Activated! Funds are now earning yield in the vault.");
+            window.location.reload();
+        } catch (err: any) {
+            console.error(err);
+            alert(err.message || "Failed to activate yield");
         } finally {
             setProcessing(false);
         }
@@ -110,8 +167,33 @@ export default function ExplorePage() {
                             key={campaign.id}
                             className="glass-panel"
                             whileHover={{ y: -5 }}
-                            style={{ padding: '24px', position: 'relative' }}
+                            style={{
+                                padding: '24px',
+                                position: 'relative',
+                                opacity: campaign.paused ? 0.7 : 1,
+                                filter: campaign.paused ? 'grayscale(0.5)' : 'none'
+                            }}
                         >
+                            {/* Emergency Badge */}
+                            {campaign.paused && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '16px',
+                                    left: '16px',
+                                    background: '#ef4444',
+                                    color: 'white',
+                                    padding: '4px 12px',
+                                    borderRadius: '8px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    zIndex: 20,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}>
+                                    <Shield size={12} /> PAUSED (EMERGENCY)
+                                </div>
+                            )}
                             {/* Risk Badge */}
                             {campaign.riskReport && (
                                 <div style={{
@@ -152,20 +234,64 @@ export default function ExplorePage() {
                                 <span style={{ color: 'var(--text-secondary)' }}>of {campaign.goal.toLocaleString()} USDC</span>
                             </div>
 
-                            <div style={{ width: '100%', height: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', marginBottom: '24px', overflow: 'hidden' }}>
+                            <div style={{ width: '100%', height: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', marginBottom: '8px', overflow: 'hidden', position: 'relative' }}>
                                 <div style={{ width: `${percent}%`, height: '100%', background: 'var(--accent)' }}></div>
+                                {campaign.totalClaimed > 0 && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        left: 0, top: 0, bottom: 0,
+                                        width: `${Math.min(100, (campaign.totalClaimed / campaign.goal) * 100)}%`,
+                                        background: 'rgba(255,255,255,0.3)',
+                                        borderRight: '2px solid white'
+                                    }}></div>
+                                )}
                             </div>
+
+                            {campaign.totalClaimed !== undefined && (
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                                    Released to creator: <strong>{campaign.totalClaimed.toLocaleString()} USDC</strong>
+                                </p>
+                            )}
+
+                            {campaign.inVault && (
+                                <div style={{
+                                    background: 'rgba(34, 197, 94, 0.1)',
+                                    padding: '12px',
+                                    borderRadius: '8px',
+                                    marginBottom: '16px',
+                                    border: '1px solid rgba(34, 197, 94, 0.2)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px'
+                                }}>
+                                    <Check size={16} color="#22c55e" />
+                                    <span style={{ fontSize: '0.8rem', color: '#22c55e' }}>
+                                        Earning Real Yield in Vault
+                                    </span>
+                                </div>
+                            )}
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{percent}% Funded</span>
                                 <button
                                     className="btn-primary"
-                                    style={{ padding: '8px 24px', fontSize: '0.9rem' }}
+                                    disabled={campaign.paused}
+                                    style={{ padding: '8px 24px', fontSize: '0.9rem', opacity: campaign.paused ? 0.5 : 1 }}
                                     onClick={() => handleDonateClick(campaign)}
                                 >
-                                    Donate
+                                    {campaign.paused ? 'Paused' : 'Donate'}
                                 </button>
                             </div>
+
+                            {percent >= 100 && !campaign.inVault && (
+                                <button
+                                    onClick={() => handleActivateYield(campaign.campaignAddress)}
+                                    className="btn-secondary"
+                                    style={{ width: '100%', marginTop: '12px', padding: '10px', fontSize: '0.85rem' }}
+                                >
+                                    ⚡ Activate Escrow Yield
+                                </button>
+                            )}
                         </motion.div>
                     );
                 })}

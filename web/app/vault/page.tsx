@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { BestowVault } from '../../lib/mockContracts';
 import { VAULTS, NETWORKS } from '../../lib/config';
-import { contractService } from '../../lib/contracts';
+import { contractService, BESTOW_VAULT_ABI } from '../../lib/contracts';
 import { ethers } from 'ethers';
 
 export default function VaultPage() {
@@ -61,8 +61,10 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
                     const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
                     if (accounts.length > 0) {
                         const data = await contractService.getVaultData(vault.address, accounts[0]);
+                        const contract = new ethers.Contract(vault.address, BESTOW_VAULT_ABI, (contractService as any).provider);
+                        const paused = await contract.paused();
                         if (data) {
-                            setUserData(data);
+                            setUserData({ ...data, paused });
                             return;
                         }
                     }
@@ -92,9 +94,9 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
                 const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
                 if (accounts.length > 0) {
                     if (action === 'deposit') {
-                        await contractService.deposit(vault.address, amount);
+                        await contractService.vaultDeposit(vault.address, amount);
                     } else {
-                        await contractService.withdraw(vault.address, amount);
+                        await contractService.vaultWithdraw(vault.address, amount);
                     }
                     onClose();
                     return;
@@ -243,14 +245,33 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
         return () => clearInterval(interval);
     }, [vault.id, vault.asset, vault.address, isConnected]);
 
+    const assetColor = vault.asset === 'USDC' ? '#2775ca' : '#f59e0b';
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             className="glass-panel"
-            style={{ padding: '32px', position: 'relative', overflow: 'hidden' }}
+            style={{
+                padding: '32px',
+                position: 'relative',
+                overflow: 'hidden',
+                borderTop: `4px solid ${assetColor}`
+            }}
         >
+            <div style={{
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                opacity: 0.03,
+                fontSize: '10rem',
+                fontWeight: 900,
+                pointerEvents: 'none',
+                color: assetColor
+            }}>
+                {vault.asset}
+            </div>
             <div style={{
                 position: 'absolute',
                 top: '16px',
@@ -295,10 +316,11 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
             <div style={{ display: 'flex', gap: '12px' }}>
                 <button
                     onClick={() => onAction('deposit')}
+                    disabled={userData?.paused}
                     className="btn-primary"
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, opacity: userData?.paused ? 0.5 : 1 }}
                 >
-                    Deposit
+                    {userData?.paused ? 'Paused' : 'Deposit'}
                 </button>
                 <button
                     onClick={() => onAction('withdraw')}

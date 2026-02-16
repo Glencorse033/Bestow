@@ -97,19 +97,9 @@ export default function Home() {
                         className="glass-panel"
                         style={{ padding: '32px' }}
                     >
-                        <div style={{ fontSize: '2rem', marginBottom: '16px' }}>🤖</div>
-                        <h3 style={{ marginBottom: '12px' }}>AI-Powered Risk Analysis</h3>
-                        <p style={{ color: 'var(--text-secondary)' }}>Real-time auditing of campaign legitimacy and developer reputation analysis to prevent fraud.</p>
-                    </motion.div>
-
-                    <motion.div
-                        whileHover={{ y: -5 }}
-                        className="glass-panel"
-                        style={{ padding: '32px' }}
-                    >
                         <div style={{ fontSize: '2rem', marginBottom: '16px' }}>🛡️</div>
-                        <h3 style={{ marginBottom: '12px' }}>Milestone-Based Escrow</h3>
-                        <p style={{ color: 'var(--text-secondary)' }}>Funds are released only when verified milestones are met, protecting backer funds.</p>
+                        <h3 style={{ marginBottom: '12px' }}>AI Trust Sentinel</h3>
+                        <p style={{ color: 'var(--text-secondary)' }}>Enterprise-grade risk assessment and fraud detection to ensure your support goes to verified, high-quality projects.</p>
                     </motion.div>
 
                     <motion.div
@@ -117,9 +107,19 @@ export default function Home() {
                         className="glass-panel"
                         style={{ padding: '32px' }}
                     >
-                        <div style={{ fontSize: '2rem', marginBottom: '16px' }}>💰</div>
-                        <h3 style={{ marginBottom: '12px' }}>Yield Vaults</h3>
-                        <p style={{ color: 'var(--text-secondary)' }}>Earn native yield on your idle assets with our specialized institutional vaults on the ARC Network.</p>
+                        <div style={{ fontSize: '2rem', marginBottom: '16px' }}>🏗️</div>
+                        <h3 style={{ marginBottom: '12px' }}>Accountable Governance</h3>
+                        <p style={{ color: 'var(--text-secondary)' }}>Funding is released in tranches only upon verified milestone completion, ensuring maximum creator accountability.</p>
+                    </motion.div>
+
+                    <motion.div
+                        whileHover={{ y: -5 }}
+                        className="glass-panel"
+                        style={{ padding: '32px' }}
+                    >
+                        <div style={{ fontSize: '2rem', marginBottom: '16px' }}>⚡</div>
+                        <h3 style={{ marginBottom: '12px' }}>Yield-Powered Escrow</h3>
+                        <p style={{ color: 'var(--text-secondary)' }}>Maximize impact with funds that never sit idle. Escrowed capital earns native institutional yield while projects are being built.</p>
                     </motion.div>
                 </div>
             </section>

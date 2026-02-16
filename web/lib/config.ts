@@ -2,11 +2,11 @@
 
 export const NETWORKS = {
     ARC: {
-        chainId: '0x4cefa2', // 5042002
+        chainId: process.env.NEXT_PUBLIC_ARC_CHAIN_ID || '0x4cefa2',
         name: 'ARC Testnet',
         currency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-        rpc: 'https://testnet-rpc.arc.io',
-        explorer: 'https://testnet-explorer.arc.io'
+        rpc: process.env.NEXT_PUBLIC_ARC_RPC || 'https://testnet-rpc.arc.io',
+        explorer: process.env.NEXT_PUBLIC_ARC_EXPLORER || 'https://testnet-explorer.arc.io'
     }
 };
 
@@ -19,7 +19,7 @@ export const VAULTS = [
         tvl: '$1.2M',
         asset: 'USDC',
         risk: 'Low',
-        address: '0x3600000000000000000000000000000000000000'
+        address: process.env.NEXT_PUBLIC_BESTOW_VAULT_ADDRESS || '0x3600000000000000000000000000000000000000'
     },
     {
         id: 'pool-arc-eurc',
@@ -29,6 +29,11 @@ export const VAULTS = [
         tvl: '$840K',
         asset: 'EURC',
         risk: 'Medium',
-        address: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a'
+        address: process.env.NEXT_PUBLIC_BESTOW_EURC_VAULT_ADDRESS || '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a'
     },
 ];
+
+export const CONTRACT_ADDRESSES = {
+    BESTOW_HUB: process.env.NEXT_PUBLIC_BESTOW_HUB_ADDRESS || '0x0000000000000000000000000000000000000000',
+    BESTOW_VAULT: process.env.NEXT_PUBLIC_BESTOW_VAULT_ADDRESS || '0x3600000000000000000000000000000000000000'
+};

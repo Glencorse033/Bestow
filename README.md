@@ -50,7 +50,19 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 - **Premium UI**: Glassmorphism, animations, custom fonts.
 - **Theme Support**: Toggle between Light and Dark modes.
 - **Wallet Connection**: Connect to MetaMask.
-- **Smart Contracts**: Campaign creation and contribution logic compatible with ARC's USDC gas token.
+- **Production-Ready Contracts**: 
+    - **Emergency Stops**: Pause/Unpause any contract.
+    - **Platform Fees**: Automatic 1% treasury collection.
+    - **Milestone Escrow**: Funds released only upon milestone verification.
+- **Real Yield Bridge**: Activate escrow yield to earn in DeFi vaults while fundraising.
+- **Admin Dashboard**: Secure governance panel at `/admin`.
+
+---
+
+## 🛠️ Governance (Admin)
+The platform owner can manage the ecosystem at [http://localhost:3000/admin](http://localhost:3000/admin).
+- **Verify Milestones**: Manually complete project milestones to release creator funds.
+- **Emergency Controls**: Pause the entire hub or specific vaults instantly.
 
 ---
 

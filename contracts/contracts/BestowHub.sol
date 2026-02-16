@@ -1,9 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./Campaign.sol";
 
-contract BestowHub {
+contract BestowHub is Ownable, Pausable {
+    address public treasury;
+    address public campaignVault;
+    uint256 public platformFeeBps = 100; // 1% default
+
+    constructor() Ownable(msg.sender) {
+        treasury = msg.sender;
+    }
+
+    function setCampaignVault(address _vault) external onlyOwner {
+        campaignVault = _vault;
+    }
+
     struct CampaignInfo {
         address campaignAddress;
         string title;
@@ -27,7 +41,7 @@ contract BestowHub {
         uint256[] memory _milestonePcts,
         uint256 _riskScore,
         string memory _riskLevel
-    ) external {
+    ) external whenNotPaused {
         // Input validation
         require(bytes(_title).length > 0 && bytes(_title).length <= 100, "Title must be 1-100 chars");
         require(bytes(_description).length >= 50 && bytes(_description).length <= 2000, "Description must be 50-2000 chars");
@@ -63,5 +77,24 @@ contract BestowHub {
 
     function getCampaigns() external view returns (CampaignInfo[] memory) {
         return campaigns;
+    }
+
+    // Admin Functions
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "Invalid address");
+        treasury = _treasury;
+    }
+
+    function setPlatformFee(uint256 _feeBps) external onlyOwner {
+        require(_feeBps <= 1000, "Max fee 10%");
+        platformFeeBps = _feeBps;
     }
 }

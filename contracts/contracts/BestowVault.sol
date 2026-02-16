@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract BestowVault {
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+
+contract BestowVault is Ownable, ReentrancyGuard, Pausable {
     string public name;
     string public asset; // e.g. "USDC"
     uint256 public totalDeposits;
     uint256 public lockupDuration; // in seconds
     uint256 public APY; // Base APY in basis points (e.g. 1250 = 12.5%)
-    address public owner;
+    uint256 public rewardPool;
 
     struct Deposit {
         uint256 amount;
@@ -23,22 +27,20 @@ contract BestowVault {
     event RewardsRefilled(uint256 amount);
     event ParamsUpdated(uint256 newAPY, uint256 newLockup);
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
-        _;
-    }
 
-    constructor(string memory _name, string memory _asset, uint256 _lockupDuration, uint256 _apy) {
+    constructor(string memory _name, string memory _asset, uint256 _lockupDuration, uint256 _apy) 
+        Ownable(msg.sender) 
+    {
         name = _name;
         asset = _asset;
         lockupDuration = _lockupDuration;
         APY = _apy;
-        owner = msg.sender;
     }
 
     // Admin Functions
 
     function refillRewards() external payable onlyOwner {
+        rewardPool += msg.value;
         emit RewardsRefilled(msg.value);
     }
 
@@ -48,18 +50,24 @@ contract BestowVault {
         emit ParamsUpdated(_newAPY, _newLockup);
     }
 
-    function transferOwnership(address _newOwner) external onlyOwner {
-        require(_newOwner != address(0), "Invalid owner");
-        owner = _newOwner;
+    function pause() external onlyOwner {
+        _pause();
     }
 
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+
     function emergencyWithdraw() external onlyOwner {
-        payable(owner).transfer(address(this).balance);
+        uint256 balance = address(this).balance;
+        (bool success, ) = payable(owner()).call{value: balance}("");
+        require(success, "Emergency withdrawal failed");
     }
 
     // Interactive Functions
 
-    function deposit() external payable {
+    function deposit() external payable whenNotPaused {
         require(msg.value > 0, "Amount must be > 0");
 
         Deposit storage userDeposit = deposits[msg.sender];
@@ -68,9 +76,10 @@ contract BestowVault {
         if (userDeposit.amount > 0) {
             uint256 pending = calculateYield(msg.sender);
             if (pending > 0) {
-                // Ensure contract has enough funds (reward pool)
-                require(address(this).balance >= pending, "Insufficient reward pool");
-                payable(msg.sender).transfer(pending);
+                require(rewardPool >= pending, "Insufficient reward pool");
+                rewardPool -= pending;
+                (bool success, ) = payable(msg.sender).call{value: pending}("");
+                require(success, "Yield claim failed");
                 emit YieldClaimed(msg.sender, pending);
             }
         }
@@ -83,16 +92,8 @@ contract BestowVault {
         emit Deposited(msg.sender, msg.value);
     }
 
-    // Reentrancy guard
-    bool private locked;
-    modifier nonReentrant() {
-        require(!locked, "Reentrant call");
-        locked = true;
-        _;
-        locked = false;
-    }
 
-    function withdraw(uint256 amount) external nonReentrant {
+    function withdraw(uint256 amount) external nonReentrant whenNotPaused {
         Deposit storage userDeposit = deposits[msg.sender];
         require(userDeposit.amount >= amount, "Insufficient balance");
         require(block.timestamp >= userDeposit.timestamp + lockupDuration, "Funds are locked");
@@ -107,10 +108,14 @@ contract BestowVault {
         
         // Cache total to transfer
         uint256 totalTransfer = amount + pending;
-        require(address(this).balance >= totalTransfer, "Insufficient vault balance");
+        if (pending > 0) {
+            require(rewardPool >= pending, "Insufficient reward pool for yield");
+            rewardPool -= pending;
+        }
         
         // Single external call at the end
-        payable(msg.sender).transfer(totalTransfer);
+        (bool success, ) = payable(msg.sender).call{value: totalTransfer}("");
+        require(success, "Withdrawal failed");
         
         emit YieldClaimed(msg.sender, pending);
         emit Withdrawn(msg.sender, amount, pending);

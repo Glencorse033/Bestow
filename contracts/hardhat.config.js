@@ -1,17 +1,20 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
+const ARC_RPC = process.env.ARC_TESTNET_RPC || "https://testnet-rpc.arc.io";
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
     solidity: "0.8.20",
     networks: {
         hardhat: {
-            chainId: 1337 // Standard local chain ID
+            chainId: 1337
         },
-        // Add ARC Testnet later
         arc_testnet: {
-            url: "https://testnet-rpc.arc.io", // Placeholder, check docs
+            url: ARC_RPC,
             chainId: 5042002,
-            // accounts: [PRIVATE_KEY] 
+            accounts: [PRIVATE_KEY]
         }
     }
 };
