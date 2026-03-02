@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
-import { GoogleGenAI } from '@google/genai';
 
 export async function POST(req: Request) {
     try {
@@ -11,7 +10,6 @@ export async function POST(req: Request) {
             console.error("Missing GEMINI_API_KEY environment variable");
             throw new Error("Missing GEMINI_API_KEY");
         }
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         // Perform AI Risk Analysis
         const prompt = `
@@ -30,15 +28,22 @@ export async function POST(req: Request) {
             - Reasonable, clear, utility-focused projects get a low score closer to 0.
         `;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: 'application/json',
-            }
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+            })
         });
 
-        const aiOutput = response.text || "{}";
+        if (!geminiRes.ok) {
+            const errText = await geminiRes.text();
+            throw new Error(`Gemini API error: ${geminiRes.status} ${errText}`);
+        }
+
+        const data = await geminiRes.json();
+        const aiOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
         let aiData;
         try {
             aiData = JSON.parse(aiOutput);
@@ -87,7 +92,10 @@ export async function POST(req: Request) {
         });
 
     } catch (error: any) {
-        console.error("Oracle Signer Error:", error);
-        return NextResponse.json({ error: "Failed to generate AI Risk Score" }, { status: 500 });
+        return NextResponse.json({
+            error: "Failed to generate AI Risk Score",
+            details: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+        }, { status: 500 });
     }
 }
