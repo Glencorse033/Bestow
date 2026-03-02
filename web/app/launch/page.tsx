@@ -107,7 +107,7 @@ export default function LaunchPage() {
                         let parsedGoal;
                         try {
                             parsedGoal = ethers.parseEther(goal.toString() || "0");
-                            if (parsedGoal <= 0n) throw new Error();
+                            if (parsedGoal <= BigInt(0)) throw new Error();
                         } catch {
                             alert("Goal must be a positive number.");
                             return;

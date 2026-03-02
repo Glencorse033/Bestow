@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
+import { GoogleGenAI } from '@google/genai';
 
-const SCAM_CLUSTERS = [
-    { name: 'Phishing Keywords', keywords: ['vitalik', 'elon', 'password', 'private key', 'giveaway'], weight: 40 },
-    { name: 'Unrealistic Returns', keywords: ['guaranteed', '100%', 'double your', 'no risk', 'daily profit'], weight: 35 },
-    { name: 'Urgency Pressure', keywords: ['urgent', 'act now', 'last chance', 'limited time'], weight: 15 }
-];
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(req: Request) {
     try {
@@ -13,37 +10,41 @@ export async function POST(req: Request) {
         const { title, description, goal, creatorAddress } = body;
 
         // Perform AI Risk Analysis
-        let score = 0;
-        const flags: string[] = [];
-        const lowerDesc = description.toLowerCase();
-        const lowerTitle = title.toLowerCase();
+        const prompt = `
+            You are a Web3 security AI scoring risk for a Web3 crowdfunding platform called Bestow on the ARC blockchain.
+            Analyze this campaign proposal and output ONLY a JSON object with this exact structure:
+            { "score": <number 0-100>, "flags": ["List", "Of", "Warning", "Signals"] }
+            
+            Campaign Title: ${title}
+            Campaign Goal: ${goal} USDC
+            Description Length: ${description.length} chars
+            Description Snippet: ${description.substring(0, 500)}
 
-        // 1. Cluster Analysis
-        SCAM_CLUSTERS.forEach(cluster => {
-            const found = cluster.keywords.filter(k => lowerDesc.includes(k) || lowerTitle.includes(k));
-            if (found.length > 0) {
-                score += cluster.weight;
-                flags.push(`Matched ${cluster.name}: "${found.join(', ')}"`);
+            Scoring context:
+            - Unrealistic APY promises, buzzwords like "guaranteed 10X", "elon", or "giveaway" should heavily increase the score (scam indication).
+            - Empty or extremely brief descriptions seeking high funding amounts are high risk.
+            - Reasonable, clear, utility-focused projects get a low score closer to 0.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
             }
         });
 
-        // 2. Sustainability Analysis
-        const wordCount = description.split(' ').length;
-        if (goal > 50000 && wordCount < 30) {
-            score += 25;
-            flags.push("High funding goal with minimal project detail");
+        const aiOutput = response.text || "{}";
+        let aiData;
+        try {
+            aiData = JSON.parse(aiOutput);
+        } catch (e) {
+            console.error("Failed to parse Gemini JSON:", aiOutput);
+            aiData = { score: 99, flags: ["Error parsing AI response"] };
         }
 
-        // 3. Formatting
-        if (description.length > 20 && description === description.toUpperCase()) {
-            score += 20;
-            flags.push("Non-professional formatting (ALL CAPS)");
-        }
-
-        if (description.length < 50) {
-            score += 15;
-            flags.push("Description is too short for verification");
-        }
+        const score = aiData.score || 0;
+        const flags = aiData.flags || [];
 
         // Determine Level
         let level = 'LOW';
