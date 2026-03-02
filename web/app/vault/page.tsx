@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { BestowVault } from '../../lib/mockContracts';
 import { VAULTS, NETWORKS } from '../../lib/config';
-import { contractService, BESTOW_VAULT_ABI } from '../../lib/contracts';
+import { contractService, BESTOW_VAULT_ABI, enforceNetwork } from '../../lib/contracts';
 import { ethers } from 'ethers';
 
 export default function VaultPage() {
@@ -60,7 +60,7 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
                 if (typeof window !== 'undefined' && (window as any).ethereum) {
                     const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
                     if (accounts.length > 0) {
-                        const data = await contractService.getVaultData(vault.address, accounts[0]);
+                        const data = await contractService.getVaultData(vault.address, accounts[0], vault.tokenAddress);
                         const contract = new ethers.Contract(vault.address, BESTOW_VAULT_ABI, (contractService as any).provider);
                         const paused = await contract.paused();
                         if (data) {
@@ -70,7 +70,7 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
                     }
                 }
                 // Fallback to mock
-                const apyValue = parseFloat(vault.apy) || 12.5;
+                const apyValue = Number(vault.apy) || 12.5;
                 setUserData(BestowVault.getUserData(vault.id, vault.asset, apyValue));
             }
         };
@@ -82,7 +82,7 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
     const balance = userData?.balance || 0;
     const deposited = userData?.deposited !== undefined ? userData.deposited : (userData?.deposit?.amount || 0);
     const max = action === 'deposit' ? balance : deposited;
-    const enteredAmount = parseFloat(amount) || 0;
+    const enteredAmount = Number(amount) || 0;
     const isValid = enteredAmount > 0 && enteredAmount <= max;
 
     const handleExecute = async () => {
@@ -93,8 +93,11 @@ function VaultModal({ vault, action, onClose }: { vault: any, action: 'deposit' 
             if (typeof window !== 'undefined' && (window as any).ethereum) {
                 const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
                 if (accounts.length > 0) {
+                    // SECURITY FIX: Silent Mainnet Transaction Risk
+                    await enforceNetwork(new ethers.BrowserProvider((window as any).ethereum));
+
                     if (action === 'deposit') {
-                        await contractService.vaultDeposit(vault.address, amount);
+                        await contractService.vaultDeposit(vault.address, amount, vault.tokenAddress);
                     } else {
                         await contractService.vaultWithdraw(vault.address, amount);
                     }
@@ -229,7 +232,7 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
             if (typeof window !== 'undefined' && (window as any).ethereum) {
                 const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
                 if (accounts.length > 0) {
-                    const data = await contractService.getVaultData(vault.address, accounts[0]);
+                    const data = await contractService.getVaultData(vault.address, accounts[0], vault.tokenAddress);
                     if (data) {
                         setUserData(data);
                         return;
@@ -238,9 +241,14 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
             }
 
             // Fallback to simulation if contract call fails or not available
-            const apyValue = parseFloat(vault.apy) || 12.5;
+            const apyValue = Number(vault.apy) || 12.5;
             const data = BestowVault.getUserData(vault.id, vault.asset, apyValue);
-            setUserData(data);
+            // Enrich with static config for TVL/APY fallback
+            setUserData({
+                ...data,
+                baseApy: apyValue,
+                tvl: Number(vault.tvl.replace(/[^0-9.]/g, '')) * 1000000
+            });
         }, 3000); // 3 seconds for blockchain updates
         return () => clearInterval(interval);
     }, [vault.id, vault.asset, vault.address, isConnected]);
@@ -293,11 +301,20 @@ function VaultCard({ vault, index, onAction }: { vault: any, index: number, onAc
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
                 <div>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>APY</p>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent)' }}>{vault.apy}</p>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent)' }}>
+                        {isConnected && userData ? `${userData.baseApy.toFixed(1)}%` : vault.apy}
+                    </p>
                 </div>
                 <div>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>TVL</p>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>{vault.tvl}</p>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+                        {isConnected && userData ?
+                            (userData.tvl >= 1000000 ? `$${(userData.tvl / 1000000).toFixed(1)}M` :
+                                userData.tvl >= 1000 ? `$${(userData.tvl / 1000).toFixed(1)}K` :
+                                    `$${userData.tvl.toFixed(0)}`)
+                            : vault.tvl
+                        }
+                    </p>
                 </div>
             </div>
 

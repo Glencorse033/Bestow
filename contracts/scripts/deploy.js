@@ -1,33 +1,62 @@
-const hre = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 async function main() {
-    const [deployer] = await hre.ethers.getSigners();
-    console.log("Deploying contracts with the account:", deployer.address);
+    const [deployer] = await ethers.getSigners();
+    console.log("Deploying with:", deployer.address);
 
-    // 1. Deploy BestowHub
-    const BestowHub = await hre.ethers.getContractFactory("BestowHub");
-    const bestowHub = await BestowHub.deploy();
-    await bestowHub.waitForDeployment();
-    console.log(`BestowHub deployed to: ${bestowHub.target}`);
+    const oracleSigner = process.env.ORACLE_SIGNER_ADDRESS;
+    const treasury = deployer.address; // update to a real treasury wallet
 
-    // 2. Deploy BestowVault (Stablecoin Yield Alpha)
-    const BestowVault = await hre.ethers.getContractFactory("BestowVault");
-    const vault = await BestowVault.deploy(
-        "Stablecoin Yield Alpha", // Name
-        "USDC",                   // Asset
-        7 * 24 * 60 * 60,         // 7 days lockup
-        1250                      // 12.5% APY (1250 basis points)
+    // 1. Deploy EURC Mock Token
+    const EURC = await ethers.getContractFactory("MockEURC");
+    const eurc = await EURC.deploy();
+    await eurc.waitForDeployment();
+    console.log("EURC Token:    ", await eurc.getAddress());
+
+    // 2. Deploy BestowHub (UUPS Proxy)
+    const BestowHub = await ethers.getContractFactory("BestowHub");
+    const hub = await upgrades.deployProxy(
+        BestowHub,
+        [treasury],
+        { initializer: "initialize", kind: "uups" }
     );
-    await vault.waitForDeployment();
-    console.log(`BestowVault (USDC) deployed to: ${vault.target}`);
+    await hub.waitForDeployment();
+    console.log("BestowHub:     ", await hub.getAddress());
 
-    // 3. Log details for Frontend use
-    console.log("\n--- Frontend Configuration ---");
-    console.log("NEXT_PUBLIC_BESTOW_HUB_ADDRESS=" + bestowHub.target);
-    console.log("NEXT_PUBLIC_BESTOW_VAULT_ADDRESS=" + vault.target);
+    // Set the Oracle Signer specifically
+    await hub.setOracleSigner(oracleSigner);
+    console.log("Oracle Signer configured ✅");
+
+    // 3. Deploy USDC Vault (UUPS Proxy)
+    const USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
+    const VaultFactory = await ethers.getContractFactory("BestowVault4626");
+    const usdcVault = await upgrades.deployProxy(
+        VaultFactory,
+        [USDC_ADDRESS, "Bestow USDC Vault", "bUSDC", treasury],
+        { initializer: "initialize", kind: "uups" }
+    );
+    await usdcVault.waitForDeployment();
+    console.log("Vault (USDC):  ", await usdcVault.getAddress());
+
+    // 4. Deploy EURC Vault (UUPS Proxy)
+    const eurcVault = await upgrades.deployProxy(
+        VaultFactory,
+        [await eurc.getAddress(), "Bestow EURC Vault", "bEURC", treasury],
+        { initializer: "initialize", kind: "uups" }
+    );
+    await eurcVault.waitForDeployment();
+    console.log("Vault (EURC):  ", await eurcVault.getAddress());
+
+    // 5. Wire the vault into the Hub
+    await hub.setCampaignVault(await usdcVault.getAddress());
+    console.log("Vault linked to Hub ✅");
+
+    // Save these addresses — you'll need them for .env.local
+    console.log("\n--- COPY THESE INTO web/.env.local ---");
+    console.log(`NEXT_PUBLIC_HUB_ADDRESS=${await hub.getAddress()}`);
+    console.log(`NEXT_PUBLIC_USDC_VAULT=${await usdcVault.getAddress()}`);
+    console.log(`NEXT_PUBLIC_EURC_VAULT=${await eurcVault.getAddress()}`);
+    console.log(`NEXT_PUBLIC_EURC_TOKEN=${await eurc.getAddress()}`);
 }
 
-main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-});
+main().catch((err) => { console.error(err); process.exit(1); });

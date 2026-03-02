@@ -32,6 +32,7 @@ contract Campaign is ReentrancyGuard, Pausable {
 
     string public title;
     string public description;
+    string public image; // Added for visuals
     uint256 public target;
     uint256 public deadline;
     address public creator;
@@ -40,6 +41,9 @@ contract Campaign is ReentrancyGuard, Pausable {
     bool public claimed; // Kept for backward compatibility, but we now use totalClaimed
     address public hub;
     bool public inVault;
+
+    // SECURITY FIX: Fee Evasion via Micro-Transactions
+    uint256 public constant MIN_DONATION = 1e6; // 1 USDC in 6-decimal units
 
     Milestone[] public milestones;
     RiskInfo public riskProfile;
@@ -52,6 +56,7 @@ contract Campaign is ReentrancyGuard, Pausable {
     constructor(
         string memory _title,
         string memory _description,
+        string memory _image,
         uint256 _target,
         uint256 _deadline,
         address _creator,
@@ -62,6 +67,7 @@ contract Campaign is ReentrancyGuard, Pausable {
     ) {
         title = _title;
         description = _description;
+        image = _image;
         target = _target;
         deadline = _deadline;
         creator = _creator;
@@ -69,7 +75,7 @@ contract Campaign is ReentrancyGuard, Pausable {
         
         riskProfile = RiskInfo(_riskScore, _riskLevel);
 
-        require(_milestoneDescs.length == _milestonePcts.length, "Milestone mismatch");
+        require(_milestoneDescs.length == _milestonePcts.length, "CAMP:MILE_LEN");
         uint256 totalPct = 0;
         for (uint i = 0; i < _milestoneDescs.length; i++) {
             totalPct += _milestonePcts[i];
@@ -79,25 +85,27 @@ contract Campaign is ReentrancyGuard, Pausable {
                 completed: false
             }));
         }
-        require(totalPct == 100, "Milestones must sum to 100%");
+        require(totalPct == 100, "CAMP:TOTAL_PCT");
     }
 
     // Since ARC uses USDC as gas, we use msg.value to accept native token (USDC)
     function donate() external payable whenNotPaused nonReentrant {
         require(block.timestamp < deadline, "Campaign ended");
-        require(msg.value > 0, "Donation must be > 0");
+        // SECURITY FIX: Fee Evasion via Micro-Transactions
+        require(msg.value >= MIN_DONATION, "Donation below minimum threshold");
 
         uint256 feeBps = IBestowHub(hub).platformFeeBps();
         uint256 fee = (msg.value * feeBps) / 10000;
         uint256 netDonation = msg.value - fee;
 
+        // SECURITY FIX: CEI Pattern — all state changes BEFORE external calls
+        contributions[msg.sender] += netDonation;
+        totalRaised += netDonation;
+
         if (fee > 0) {
             (bool success, ) = payable(IBestowHub(hub).treasury()).call{value: fee}("");
             require(success, "Fee transfer failed");
         }
-
-        contributions[msg.sender] += netDonation;
-        totalRaised += netDonation;
 
         emit DonationReceived(msg.sender, netDonation);
     }
@@ -118,14 +126,15 @@ contract Campaign is ReentrancyGuard, Pausable {
         
         require(amountToWithdraw > 0, "No funds available for withdrawal");
 
-        if (inVault) {
-            address vault = IBestowHub(hub).campaignVault();
-            IBestowVault(vault).withdraw(amountToWithdraw);
-        }
-
+        // SECURITY FIX: CEI Pattern — update state BEFORE external calls
         totalClaimed += amountToWithdraw;
         if (totalClaimed >= totalRaised) {
             claimed = true;
+        }
+
+        if (inVault) {
+            address vault = IBestowHub(hub).campaignVault();
+            IBestowVault(vault).withdraw(amountToWithdraw);
         }
 
         (bool success, ) = payable(creator).call{value: amountToWithdraw}("");
@@ -166,5 +175,16 @@ contract Campaign is ReentrancyGuard, Pausable {
         uint256 totalYield = IBestowVault(vault).calculateYield(address(this));
         if (totalRaised == 0) return 0;
         return (totalYield * contributions[contributor]) / totalRaised;
+    }
+
+    // SECURITY FIX: Unpausable Pausable Contracts
+    function pause() external {
+        require(msg.sender == IBestowHub(hub).owner(), "Not hub owner");
+        _pause();
+    }
+
+    function unpause() external {
+        require(msg.sender == IBestowHub(hub).owner(), "Not hub owner");
+        _unpause();
     }
 }

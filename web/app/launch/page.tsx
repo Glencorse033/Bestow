@@ -3,10 +3,11 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { BestowHub as MockHub } from '../../lib/mockContracts';
-import { contractService } from '../../lib/contracts';
+import { contractService, enforceNetwork } from '../../lib/contracts';
 import { CONTRACT_ADDRESSES } from '../../lib/config';
 import { analyzeRisk, RiskReport } from '../../lib/riskAnalysis';
 import { Camera, Shield, Target, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ethers } from 'ethers';
 
 export default function LaunchPage() {
     const [loading, setLoading] = useState(false);
@@ -22,6 +23,46 @@ export default function LaunchPage() {
 
     // New Feature State
     const [milestones, setMilestones] = useState([{ desc: 'Initial Release', amount: 50 }]); // Default 50%
+    const [imageUrl, setImageUrl] = useState('');
+
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // basic validation
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                // Resize logic using Canvas to keep Base64 small
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 300;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                // Compress to JPEG for smaller footprint
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.4);
+                setImageUrl(compressedBase64);
+            };
+            img.src = event.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+    };
 
     const addMilestone = () => {
         setMilestones([...milestones, { desc: '', amount: 0 }]);
@@ -54,7 +95,23 @@ export default function LaunchPage() {
                         const goal = (e.target as any).goal.value;
                         const desc = (e.target as any).desc.value;
 
-                        if (!title || !goal || !desc) return;
+                        // Enforce Contract Constraints
+                        if (!title || title.length > 100) {
+                            alert("Title must be between 1 and 100 characters.");
+                            return;
+                        }
+                        if (!desc || desc.length < 50 || desc.length > 2000) {
+                            alert("Description must be between 50 and 2000 characters to be secured on-chain.");
+                            return;
+                        }
+                        let parsedGoal;
+                        try {
+                            parsedGoal = ethers.parseEther(goal.toString() || "0");
+                            if (parsedGoal <= 0n) throw new Error();
+                        } catch {
+                            alert("Goal must be a positive number.");
+                            return;
+                        }
 
                         // Validate milestones sum to 100%
                         const totalPct = milestones.reduce((acc, m) => acc + (m.amount || 0), 0);
@@ -65,39 +122,54 @@ export default function LaunchPage() {
 
                         setLoading(true);
                         try {
-                            const autoRiskReport = await analyzeRisk(title || '', desc, parseFloat(goal) || 0);
+                            // SECURITY FIX: Silent Mainnet Transaction Risk
+                            await enforceNetwork(new ethers.BrowserProvider((window as any).ethereum));
+
+                            const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+                            const creatorAddress = accounts[0];
+
+                            // SECURITY FIX: Client-Side Score Forgery
+                            // Call secure server side API to compute risk score and sign it
+                            const riskResponse = await fetch('/api/analyze-risk', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    title,
+                                    description: desc,
+                                    goal: goal.toString() || "0",
+                                    creatorAddress
+                                })
+                            });
+
+                            if (!riskResponse.ok) throw new Error("Failed to get risk score from Oracle");
+                            const { riskScore, riskLevel, signature, timestamp } = await riskResponse.json();
 
                             // Contract Interaction
                             const campaignData = {
                                 title,
                                 description: desc,
-                                target: parseFloat(goal),
+                                image: imageUrl,
+                                target: parsedGoal.toString(),
                                 duration: 30, // Default 30 days
                                 milestones: milestones.map(m => ({
                                     description: m.desc,
                                     offsetPercent: m.amount
                                 })),
-                                riskScore: autoRiskReport.score,
-                                riskLevel: autoRiskReport.level
+                                riskScore,
+                                riskLevel,
+                                signature,
+                                timestamp
                             };
 
                             try {
                                 await contractService.createCampaign(CONTRACT_ADDRESSES.BESTOW_HUB, campaignData);
+                                setSuccess(true);
+                                (e.target as any).reset();
+                                setImageUrl('');
                             } catch (contractErr) {
-                                console.warn("Contract creation failed, falling back to mock:", contractErr);
-                                // Fallback to mock for testing/no-provider cases
-                                await MockHub.createCampaign(
-                                    title,
-                                    parseFloat(goal),
-                                    desc,
-                                    milestones,
-                                    autoRiskReport,
-                                    `linear-gradient(135deg, #3b82f6, #8b5cf6)`
-                                );
+                                console.error("Contract creation failed:", contractErr);
+                                alert("Blockchain Error: " + (contractErr as any).message);
                             }
-
-                            setSuccess(true);
-                            (e.target as any).reset();
                         } catch (err) {
                             alert("Failed to launch campaign: " + (err as any).message);
                         } finally {
@@ -107,24 +179,52 @@ export default function LaunchPage() {
                     style={{ display: 'grid', gap: '24px' }}
                 >
                     <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Project Image</label>
-                        <label style={{
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '12px 20px',
-                            background: 'var(--bg-secondary)',
-                            borderRadius: '12px',
-                            border: '1px solid var(--border)',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.9rem',
-                            fontWeight: 500
-                        }}>
-                            <Camera size={18} />
-                            Upload Cover Photo
-                            <input type="file" accept="image/*" style={{ display: 'none' }} />
-                        </label>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Project Cover Photo</label>
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                            <label style={{
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '200px',
+                                height: '120px',
+                                background: 'var(--bg-secondary)',
+                                borderRadius: '12px',
+                                border: '2px dashed var(--border)',
+                                color: 'var(--text-secondary)',
+                                transition: 'all 0.2s ease'
+                            }}>
+                                <Camera size={24} style={{ marginBottom: '8px' }} />
+                                <span style={{ fontSize: '0.8rem' }}>Upload Image</span>
+                                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
+                            </label>
+
+                            {imageUrl && (
+                                <div style={{ position: 'relative' }}>
+                                    <img
+                                        src={imageUrl}
+                                        alt="Preview"
+                                        style={{ width: '200px', height: '120px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--accent)' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setImageUrl('')}
+                                        style={{
+                                            position: 'absolute', top: '-8px', right: '-8px',
+                                            background: '#ef4444', color: 'white', border: 'none',
+                                            borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px'
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                            Optimized for blockchain: Images are automatically resized for fast on-chain storage.
+                        </p>
                     </div>
 
                     <div>

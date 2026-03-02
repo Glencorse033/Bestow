@@ -1,6 +1,22 @@
-# Bestow - Decentralized Crowdfunding on ARC Network
+# Bestow is a next-generation crowdfunding platform built on the **ARC Testnet**, combining AI-powered risk analysis, milestone-based escrow, and yield-generating vaults to create a trustworthy ecosystem for creators and backers.
 
-Welcome to **Bestow**! This is a cutting-edge dApp tailored for the ARC Network.
+## 🚀 Deployed Contracts (ARC Testnet)
+
+- **BestowHub**: [`0x00588b14F44ca5DFa6F7be9d78E6aD3483d8b1e3`](https://testnet.arcscan.app/address/0x00588b14F44ca5DFa6F7be9d78E6aD3483d8b1e3) ✅ Verified
+- **BestowVault (USDC)**: [`0x8Fd1244039536a3100861dFc9Dd07Acb0888dc0d`](https://testnet.arcscan.app/address/0x8Fd1244039536a3100861dFc9Dd07Acb0888dc0d) ✅ Verified
+- **Network**: ARC Testnet (Chain ID: 5042002)
+- **Deployer**: `0x31c33c0FB8660E7A5161ecabb33f4D42a8Df6d6e`
+
+## ✨ Features
+- **Premium UI**: Glassmorphism, animations, custom fonts.
+- **Theme Support**: Toggle between Light and Dark modes.
+- **Wallet Connection**: Connect to MetaMask.
+- **Production-Ready Contracts**: 
+    - **Emergency Stops**: Pause/Unpause any contract.
+    - **Platform Fees**: Automatic 1% treasury collection.
+    - **Milestone Escrow**: Funds released only upon milestone verification.
+- **Real Yield Bridge**: Activate escrow yield to earn in DeFi vaults while fundraising.
+- **Admin Dashboard**: Secure governance panel at `/admin`.
 
 ## Project Structure
 - `contracts/`: Hardhat project for Smart Contracts.

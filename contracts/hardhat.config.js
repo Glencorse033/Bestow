@@ -1,20 +1,36 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("@openzeppelin/hardhat-upgrades");
 require("dotenv").config();
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
-const ARC_RPC = process.env.ARC_TESTNET_RPC || "https://testnet-rpc.arc.io";
-
-/** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-    solidity: "0.8.20",
-    networks: {
-        hardhat: {
-            chainId: 1337
-        },
-        arc_testnet: {
-            url: ARC_RPC,
-            chainId: 5042002,
-            accounts: [PRIVATE_KEY]
+    solidity: {
+        version: "0.8.24", // Using 0.8.24 to support Cancun EVM efficiently
+        settings: {
+            evmVersion: "cancun",  // ⚠️ CRITICAL — required for ReentrancyGuardTransient
+            viaIR: true, // Prevents Stack Too Deep
+            optimizer: { enabled: true, runs: 200 }
         }
+    },
+    networks: {
+        arcTestnet: {
+            url: "https://rpc.testnet.arc.network",
+            chainId: 5042002,
+            accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+        }
+    },
+    etherscan: {
+        apiKey: {
+            arcTestnet: process.env.ARCSCAN_API_KEY || "placeholder"
+        },
+        customChains: [
+            {
+                network: "arcTestnet",
+                chainId: 5042002,
+                urls: {
+                    apiURL: "https://testnet.arcscan.app/api",
+                    browserURL: "https://testnet.arcscan.app"
+                }
+            }
+        ]
     }
 };

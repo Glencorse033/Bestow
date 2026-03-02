@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { BestowHub as MockHub } from '../../lib/mockContracts';
-import { contractService, CAMPAIGN_ABI } from '../../lib/contracts';
+import { contractService, CAMPAIGN_ABI, enforceNetwork } from '../../lib/contracts';
 import { CONTRACT_ADDRESSES } from '../../lib/config';
 import { Shield, X, Check, Info } from 'lucide-react';
 import { ethers } from 'ethers';
@@ -13,6 +13,7 @@ const MAX_DONATION = 10000; // Maximum donation limit
 
 export default function ExplorePage() {
     const [campaigns, setCampaigns] = useState<any[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [isConnected, setIsConnected] = useState(false);
     const [address, setAddress] = useState<string | null>(null);
 
@@ -22,11 +23,12 @@ export default function ExplorePage() {
     const [step, setStep] = useState(1); // 1: Input, 2: Confirm, 3: Success
     const [processing, setProcessing] = useState(false);
 
-    // Derived Fees
-    const amount = parseFloat(donationAmount) || 0;
-    const platformFee = amount * 0.01;
+    // Derived Fees (Use strings for math later if strictly needed, or handle in BigInt)
+    // For UI display, we can use Number for approximations but not for contract inputs
+    const amountNum = Number(donationAmount) || 0;
+    const platformFee = amountNum * 0.01;
     const gasFee = 0.005; // Base ARC Gas
-    const total = amount + platformFee + gasFee;
+    const total = amountNum + platformFee + gasFee;
 
     // Check wallet connection and load data
     useEffect(() => {
@@ -73,7 +75,7 @@ export default function ExplorePage() {
                         const totalClaimed = await campaign.totalClaimed();
                         const paused = await campaign.paused();
                         const inVault = await campaign.inVault();
-                        return { ...c, ...details, totalClaimed: parseFloat(ethers.formatEther(totalClaimed)), paused, inVault };
+                        return { ...c, ...details, totalClaimed: ethers.formatEther(totalClaimed), paused, inVault };
                     }));
                     setCampaigns(enriched);
                     return;
@@ -105,18 +107,22 @@ export default function ExplorePage() {
             alert("Please connect your wallet first!");
             return;
         }
-        if (amount > MAX_DONATION) {
+        const amountStr = donationAmount || "0";
+        if (Number(amountStr) > MAX_DONATION) {
             alert(`Maximum donation is ${MAX_DONATION} USDC`);
             return;
         }
         setProcessing(true);
         try {
+            // SECURITY FIX: Silent Mainnet Transaction Risk
+            await enforceNetwork(new ethers.BrowserProvider((window as any).ethereum));
+
             if (selectedCampaign.campaignAddress) {
                 // Real Contract Interaction
-                await contractService.donate(selectedCampaign.campaignAddress, amount.toString());
+                await contractService.donate(selectedCampaign.campaignAddress, amountStr);
             } else {
                 // Mock Fallback
-                await MockHub.donate(selectedCampaign.id, amount, platformFee, gasFee);
+                await MockHub.donate(selectedCampaign.id, Number(amountStr), platformFee, gasFee);
             }
             setStep(3); // Success
         } catch (err) {
@@ -129,6 +135,8 @@ export default function ExplorePage() {
     const handleActivateYield = async (campaignAddress: string) => {
         try {
             setProcessing(true);
+            // SECURITY FIX: Silent Mainnet Transaction Risk
+            await enforceNetwork(new ethers.BrowserProvider((window as any).ethereum));
             await contractService.activateEscrowYield(campaignAddress);
             alert("Yield Escrow Activated! Funds are now earning yield in the vault.");
             window.location.reload();
@@ -140,12 +148,63 @@ export default function ExplorePage() {
         }
     };
 
+    const filteredCampaigns = campaigns.filter(c =>
+        c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     return (
         <div className="container" style={{ paddingTop: '80px', paddingBottom: '80px' }}>
-            <h1 style={{ fontSize: '3rem', marginBottom: '40px' }}>Explore Campaigns</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px', gap: '24px', flexWrap: 'wrap' }}>
+                <div>
+                    <h1 style={{ fontSize: '3rem', marginBottom: '8px' }}>Explore Campaigns</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>Discover and support innovative projects on the ARC Network.</p>
+                </div>
+
+                <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
+                    <input
+                        type="text"
+                        placeholder="Search projects..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '12px 16px',
+                            paddingRight: '40px',
+                            borderRadius: '12px',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border)',
+                            color: 'white',
+                            fontSize: '0.95rem'
+                        }}
+                    />
+                    {searchQuery && (
+                        <button
+                            onClick={() => setSearchQuery('')}
+                            style={{
+                                position: 'absolute',
+                                right: '12px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--text-secondary)',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <X size={18} />
+                        </button>
+                    )}
+                </div>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px' }}>
-                {campaigns.map((campaign) => {
+                {filteredCampaigns.length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '100px 0', opacity: 0.5 }}>
+                        <p style={{ fontSize: '1.2rem' }}>No projects found matching "{searchQuery}"</p>
+                    </div>
+                )}
+                {filteredCampaigns.map((campaign) => {
                     const percent = Math.min(100, Math.floor((campaign.raised / campaign.goal) * 100));
                     const riskColor = campaign.riskReport?.score > 50 ? '#ef4444' : '#10b981'; // Red or Green
 
@@ -342,8 +401,8 @@ export default function ExplorePage() {
 
                                     <button
                                         className="btn-primary"
-                                        disabled={!amount || amount <= 0}
-                                        style={{ width: '100%', padding: '16px', fontSize: '1.1rem', opacity: (!amount || amount <= 0) ? 0.5 : 1 }}
+                                        disabled={!amountNum || amountNum <= 0}
+                                        style={{ width: '100%', padding: '16px', fontSize: '1.1rem', opacity: (!amountNum || amountNum <= 0) ? 0.5 : 1 }}
                                         onClick={() => setStep(2)}
                                     >
                                         Next: Review Fees
@@ -358,7 +417,7 @@ export default function ExplorePage() {
                                     <div style={{ background: 'var(--bg-secondary)', borderRadius: '16px', padding: '24px', marginBottom: '32px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                                             <span style={{ color: 'var(--text-secondary)' }}>Donation Amount</span>
-                                            <span style={{ fontWeight: 600 }}>{amount.toFixed(2)} USDC</span>
+                                            <span style={{ fontWeight: 600 }}>{amountNum.toFixed(2)} USDC</span>
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                                             <span style={{ color: 'var(--text-secondary)' }}>Network Gas (Est.)</span>
@@ -397,7 +456,7 @@ export default function ExplorePage() {
                                     </div>
                                     <h2 style={{ marginBottom: '16px' }}>Donation Successful!</h2>
                                     <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
-                                        You successfully donated {amount.toFixed(2)} USDC to {selectedCampaign.title}.
+                                        You successfully donated {amountNum.toFixed(2)} USDC to {selectedCampaign.title}.
                                     </p>
                                     <button
                                         className="glass-panel"

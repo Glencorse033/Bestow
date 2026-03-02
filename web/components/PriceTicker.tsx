@@ -19,13 +19,16 @@ export default function PriceTicker() {
         const fetchPrices = async () => {
             try {
                 // Using CoinGecko API as a reliable open source for top crypto data
-                const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false');
+                const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=false');
                 if (res.ok) {
                     const data = await res.json();
                     setCoins(data);
+                } else if (res.status === 429) {
+                    // Silently handle rate limiting to avoid console spam
+                    console.warn("Price ticker rate-limited. Retrying later.");
                 }
             } catch (error) {
-                console.error("Failed to fetch prices", error);
+                // Ignore fetch errors in ticker to keep console clean
             } finally {
                 setLoading(false);
             }
