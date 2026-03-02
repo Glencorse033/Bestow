@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export async function POST(req: Request) {
     try {
         const body = await req.json();
         const { title, description, goal, creatorAddress } = body;
+
+        if (!process.env.GEMINI_API_KEY) {
+            console.error("Missing GEMINI_API_KEY environment variable");
+            throw new Error("Missing GEMINI_API_KEY");
+        }
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         // Perform AI Risk Analysis
         const prompt = `
